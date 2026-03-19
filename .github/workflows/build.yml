@@ -1,0 +1,64 @@
+name: Build and Push Image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/hareeen/iinact-kr-dist
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Extract version from zip filename
+        run: |
+          FNAME=$(ls FFXIV_ACT_Plugin_*.zip | head -1)
+          VERSION=$(echo "$FNAME" | sed 's/FFXIV_ACT_Plugin_//;s/\.zip//')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            # keep :latest for humans (don’t rely on it for automation)
+            type=raw,value=latest
+            # version from zip filename, for users and automation
+            type=raw,value=${{ env.VERSION }}
+            # commit traceability
+            type=sha,format=short,prefix=sha-
+            # lexicographically sortable timestamp (UTC)
+            type=raw,value=ts-{{date 'YYYYMMDDHHmmss'}}
+          labels: |
+            org.opencontainers.image.title=iinact-kr-dist
+            org.opencontainers.image.description=A distribution of the FFXIV ACT Plugin for Korean users, for IINACT-KR.
+            org.opencontainers.image.source=${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created={{date 'YYYY-MM-DDTHH:mm:ssZ'}}
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
