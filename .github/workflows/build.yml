@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: ghcr.io/hareeen/iinact-kr-dist
+  IMAGE_NAME: ghcr.io/aetherfl0w/iinact-kr-dist
 
 jobs:
   push:
